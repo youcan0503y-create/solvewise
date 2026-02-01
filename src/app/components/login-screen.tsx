@@ -8,9 +8,9 @@ import { Input } from "@/app/components/ui/input";
 import { Button } from "@/app/components/ui/button";
 import { Toaster, toast } from "sonner";
 
-// 🟢 Firebase 관련 임포트 추가
+// Firebase 관련 임포트
 import { signInWithPopup } from "firebase/auth";
-import { auth, googleProvider } from "@/lib/firebase";
+import { auth, googleProvider, githubProvider } from "@/lib/firebase"; // githubProvider 추가
 
 interface LoginScreenProps {
   onLogin: () => void;
@@ -21,25 +21,26 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
   const [step, setStep] = useState<"menu" | "input">("menu");
   const [apiKey, setApiKey] = useState("");
 
-  // 🟢 구글 로그인 핸들러
-  const handleGoogleLogin = async () => {
+  // 공통 로그인 처리 함수
+  const handleSocialLogin = async (provider: any, providerName: string) => {
     try {
-      const result = await signInWithPopup(auth, googleProvider);
+      const result = await signInWithPopup(auth, provider);
       const user = result.user;
       
-      toast.success(`${user.displayName}님 환영합니다!`);
+      toast.success(`${providerName} 로그인 성공! (${user.displayName || "사용자"}님)`);
       
-      // 이미 API 키가 저장되어 있는지 확인
       const savedKey = Storage.getApiKey();
       if (savedKey) {
         setTimeout(() => onLogin(), 500);
       } else {
-        // 키가 없으면 키 입력 단계로 이동
         setStep("input");
       }
     } catch (error: any) {
       console.error(error);
-      toast.error("로그인 실패: " + error.message);
+      // 팝업을 닫았을 때 나는 에러는 무시
+      if (error.code !== 'auth/popup-closed-by-user') {
+        toast.error(`로그인 실패: ${error.message}`);
+      }
     }
   };
 
@@ -101,9 +102,9 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
               </motion.div>
 
               <motion.div variants={itemVariants} className="w-full space-y-4">
-                {/* 🟢 구글 로그인 버튼에 onClick 연결 */}
+                {/* 구글 로그인 버튼 */}
                 <button 
-                  onClick={handleGoogleLogin}
+                  onClick={() => handleSocialLogin(googleProvider, "Google")}
                   className="w-full h-14 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl flex items-center justify-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all shadow-sm hover:shadow-md group"
                 >
                   <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -115,7 +116,11 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                   <span className="font-medium text-gray-700 dark:text-gray-200">Google로 계속하기</span>
                 </button>
 
-                <button className="w-full h-14 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl flex items-center justify-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all shadow-sm hover:shadow-md">
+                {/* 🟢 깃허브 로그인 버튼 연결 */}
+                <button 
+                  onClick={() => handleSocialLogin(githubProvider, "GitHub")}
+                  className="w-full h-14 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl flex items-center justify-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all shadow-sm hover:shadow-md"
+                >
                   <Github className="w-5 h-5 text-gray-900 dark:text-white" />
                   <span className="font-medium text-gray-700 dark:text-gray-200">GitHub로 계속하기</span>
                 </button>

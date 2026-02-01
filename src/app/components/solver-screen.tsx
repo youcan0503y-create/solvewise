@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { ArrowLeft, Camera, Send, Sparkles, X, BarChart2, Wand2 } from "lucide-react";
 import { useLanguage } from "@/app/components/language-context";
-import { LanguageToggle } from "@/app/components/language-toggle";
+// LanguageToggle 임포트 제거 (더 이상 사용하지 않음)
 import { callGemini, resizeImage, INITIAL_PROMPT, GRAPH_PROMPT } from "@/lib/gemini";
 import { Storage } from "@/lib/storage";
 import ReactMarkdown from "react-markdown";
@@ -47,7 +47,7 @@ export function SolverScreen({ onBack }: SolverScreenProps) {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages, isProcessing, graphLoadingId, showGraph]); // showGraph 추가하여 그래프 열릴 때도 스크롤
+  }, [messages, isProcessing, graphLoadingId, showGraph]);
 
   // 진행률 애니메이션
   useEffect(() => {
@@ -202,6 +202,7 @@ export function SolverScreen({ onBack }: SolverScreenProps) {
     <div className="min-h-screen flex flex-col bg-[#fafbfc] dark:bg-[#030213]">
       <Toaster position="top-center" />
 
+      {/* 헤더 */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -212,15 +213,22 @@ export function SolverScreen({ onBack }: SolverScreenProps) {
             whileHover={{ scale: 1.05, x: -2 }}
             whileTap={{ scale: 0.95 }}
             onClick={onBack}
-            className="w-10 h-10 rounded-[14px] bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 flex items-center justify-center hover:bg-white dark:hover:bg-gray-700 transition-all"
+            className="w-10 h-10 rounded-[14px] bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 flex items-center justify-center hover:bg-white dark:hover:bg-gray-700 transition-all shrink-0"
           >
             <ArrowLeft className="w-5 h-5 text-gray-700 dark:text-gray-300" />
           </motion.button>
-          <div className="flex-1">
-            <h2 className="tracking-tight font-bold text-gray-900 dark:text-white">{t("solver.title")}</h2>
-            <p className="text-xs text-muted-foreground">{t("solver.subtitle")}</p>
+          
+          {/* 🟢 텍스트 컨테이너 (언어 토글 제거 및 스타일 보정) */}
+          <div className="flex-1 min-w-0">
+            <h2 className="tracking-tight font-bold text-gray-900 dark:text-white truncate">
+              {t("solver.title")}
+            </h2>
+            <p className="text-xs text-muted-foreground truncate">
+              {t("solver.subtitle")}
+            </p>
           </div>
-          <LanguageToggle />
+          
+          {/* 언어 토글이 있던 자리가 비워짐 -> 자연스럽게 제목이 공간 차지 */}
         </div>
       </motion.div>
 
@@ -266,12 +274,12 @@ export function SolverScreen({ onBack }: SolverScreenProps) {
                 {msg.role === 'ai' && msg.result && (
                   <div className="w-full space-y-6">
                     
-                    {/* 🟢 1. 텍스트 결과 카드들 (먼저 표시) */}
+                    {/* 1. 텍스트 결과 카드들 */}
                     {parseResponse(msg.result.explanation).map((section, idx) => (
                       <ResultCard key={idx} section={section} index={idx} />
                     ))}
 
-                    {/* 🟢 2. 그래프 버튼 및 영역 (텍스트 아래로 이동) */}
+                    {/* 2. 그래프 버튼 및 영역 */}
                     <div className="flex flex-col gap-4">
                       <div className="flex justify-end">
                         {msg.result.graphCode ? (

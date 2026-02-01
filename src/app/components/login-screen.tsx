@@ -8,58 +8,70 @@ import { Input } from "@/app/components/ui/input";
 import { Button } from "@/app/components/ui/button";
 import { Toaster, toast } from "sonner";
 
+// 🟢 Firebase 관련 임포트 추가
+import { signInWithPopup } from "firebase/auth";
+import { auth, googleProvider } from "@/lib/firebase";
+
 interface LoginScreenProps {
   onLogin: () => void;
 }
 
 export function LoginScreen({ onLogin }: LoginScreenProps) {
   const { t } = useLanguage();
-  const [step, setStep] = useState<"menu" | "input">("menu"); // 단계 관리 (메뉴 vs 입력)
+  const [step, setStep] = useState<"menu" | "input">("menu");
   const [apiKey, setApiKey] = useState("");
 
-  const handleLogin = () => {
+  // 🟢 구글 로그인 핸들러
+  const handleGoogleLogin = async () => {
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      
+      toast.success(`${user.displayName}님 환영합니다!`);
+      
+      // 이미 API 키가 저장되어 있는지 확인
+      const savedKey = Storage.getApiKey();
+      if (savedKey) {
+        setTimeout(() => onLogin(), 500);
+      } else {
+        // 키가 없으면 키 입력 단계로 이동
+        setStep("input");
+      }
+    } catch (error: any) {
+      console.error(error);
+      toast.error("로그인 실패: " + error.message);
+    }
+  };
+
+  const handleApiKeyLogin = () => {
     if (!apiKey.trim()) {
       toast.error("API Key를 입력해주세요.");
       return;
     }
     Storage.setApiKey(apiKey);
-    toast.success("환영합니다!");
+    toast.success("시작합니다!");
     setTimeout(() => {
       onLogin();
     }, 500);
   };
 
-  // 애니메이션 설정 (순차적 등장)
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
-      transition: {
-        staggerChildren: 0.1, // 자식 요소들이 0.1초 간격으로 등장
-        delayChildren: 0.2,
-      },
+      transition: { staggerChildren: 0.1, delayChildren: 0.2 },
     },
-    exit: {
-      opacity: 0,
-      y: -20,
-      transition: { duration: 0.2 }
-    }
+    exit: { opacity: 0, y: -20, transition: { duration: 0.2 } }
   };
 
   const itemVariants = {
     hidden: { opacity: 0, y: 20 },
-    visible: { 
-      opacity: 1, 
-      y: 0,
-      transition: { type: "spring", stiffness: 300, damping: 24 }
-    },
+    visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } },
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-[#fafbfc] dark:bg-[#030213] relative overflow-hidden">
       <Toaster position="top-center" />
-      
-      {/* 언어 변경 버튼 */}
       <div className="fixed top-6 right-6 z-50">
         <LanguageToggle />
       </div>
@@ -67,7 +79,6 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
       <div className="w-full max-w-md z-10">
         <AnimatePresence mode="wait">
           
-          {/* 1단계: 로그인 메뉴 화면 */}
           {step === "menu" && (
             <motion.div
               key="menu"
@@ -77,7 +88,6 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
               exit="exit"
               className="flex flex-col items-center"
             >
-              {/* 로고 영역 */}
               <motion.div variants={itemVariants} className="text-center mb-12">
                 <div className="inline-flex items-center justify-center w-24 h-24 rounded-[32px] bg-gradient-to-br from-blue-400 to-blue-600 shadow-xl shadow-blue-500/20 mb-6 transform hover:scale-105 transition-transform duration-300">
                   <Layers className="w-12 h-12 text-white" />
@@ -90,10 +100,12 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                 </p>
               </motion.div>
 
-              {/* 버튼 그룹 */}
               <motion.div variants={itemVariants} className="w-full space-y-4">
-                {/* 구글 로그인 (디자인만 구현) */}
-                <button className="w-full h-14 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl flex items-center justify-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all shadow-sm hover:shadow-md group">
+                {/* 🟢 구글 로그인 버튼에 onClick 연결 */}
+                <button 
+                  onClick={handleGoogleLogin}
+                  className="w-full h-14 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl flex items-center justify-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all shadow-sm hover:shadow-md group"
+                >
                   <svg className="w-5 h-5" viewBox="0 0 24 24">
                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
                     <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
@@ -103,13 +115,11 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                   <span className="font-medium text-gray-700 dark:text-gray-200">Google로 계속하기</span>
                 </button>
 
-                {/* 깃허브 로그인 (디자인만 구현) */}
                 <button className="w-full h-14 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl flex items-center justify-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all shadow-sm hover:shadow-md">
                   <Github className="w-5 h-5 text-gray-900 dark:text-white" />
                   <span className="font-medium text-gray-700 dark:text-gray-200">GitHub로 계속하기</span>
                 </button>
 
-                {/* 구분선 */}
                 <div className="relative py-2">
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-gray-200 dark:border-gray-800"></div>
@@ -119,7 +129,6 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                   </div>
                 </div>
 
-                {/* 이메일로 계속하기 (실제 기능 진입점) */}
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -131,14 +140,12 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                 </motion.button>
               </motion.div>
 
-              {/* 하단 약관 */}
               <motion.p variants={itemVariants} className="mt-8 text-xs text-center text-gray-400 leading-relaxed max-w-xs">
                 계속 진행하시면 <span className="text-blue-500 cursor-pointer hover:underline">이용약관</span> 및 <span className="text-blue-500 cursor-pointer hover:underline">개인정보처리방침</span>에 동의하는 것으로 간주됩니다.
               </motion.p>
             </motion.div>
           )}
 
-          {/* 2단계: API Key 입력 화면 */}
           {step === "input" && (
             <motion.div
               key="input"
@@ -171,14 +178,14 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                         className="pl-10 h-14 rounded-2xl bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-blue-500 transition-all text-base"
                         value={apiKey}
                         onChange={(e) => setApiKey(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                        onKeyDown={(e) => e.key === "Enter" && handleApiKeyLogin()}
                         autoFocus
                       />
                     </div>
                   </div>
 
                   <Button 
-                    onClick={handleLogin}
+                    onClick={handleApiKeyLogin}
                     className="w-full h-14 rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all text-base font-bold"
                   >
                     <span>시작하기</span>

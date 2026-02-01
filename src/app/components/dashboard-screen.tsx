@@ -1,13 +1,17 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Plus, Clock, Image as ImageIcon, Type, ChevronRight, Trash2, Sparkles, LogOut, Cpu } from "lucide-react";
+import { Plus, Clock, Image as ImageIcon, Type, ChevronRight, Trash2, Sparkles, LogOut, Cpu, UserX } from "lucide-react"; // 🟢 UserX 아이콘 추가
 import { useLanguage } from "@/app/components/language-context";
 import { LanguageToggle } from "@/app/components/language-toggle";
 import { Storage, HistoryItem } from "@/lib/storage";
-import { checkCurrentModel } from "@/lib/gemini"; // 모델 확인 함수 임포트
+import { checkCurrentModel } from "@/lib/gemini";
 import { formatDistanceToNow } from "date-fns";
 import { ko, enUS } from "date-fns/locale";
 import { Toaster, toast } from "sonner";
+
+// 🟢 Firebase 관련 임포트 추가
+import { auth } from "@/lib/firebase";
+import { deleteUser } from "firebase/auth";
 
 interface DashboardScreenProps {
   onNewQuestion: () => void;
@@ -16,13 +20,11 @@ interface DashboardScreenProps {
 export function DashboardScreen({ onNewQuestion }: DashboardScreenProps) {
   const { language, t } = useLanguage();
   const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [currentModel, setCurrentModel] = useState<string>("Checking..."); // 모델명 상태
+  const [currentModel, setCurrentModel] = useState<string>("Checking...");
 
   useEffect(() => {
-    // 1. 히스토리 불러오기
     setHistory(Storage.getHistory());
 
-    // 2. 현재 사용 가능한 최적 모델 확인 및 표시
     const apiKey = Storage.getApiKey();
     if (apiKey) {
       checkCurrentModel(apiKey).then(modelName => {
@@ -42,9 +44,47 @@ export function DashboardScreen({ onNewQuestion }: DashboardScreenProps) {
   };
 
   const handleLogout = () => {
-    if (confirm("로그아웃 하시겠습니까? 저장된 API Key가 삭제됩니다.")) {
+    if (confirm("로그아웃 하시겠습니까?")) {
       localStorage.removeItem("solvewise_api_key");
+      auth.signOut(); // Firebase 로그아웃
       window.location.reload();
+    }
+  };
+
+  // 🟢 계정 삭제 핸들러
+  const handleDeleteAccount = async () => {
+    if (!auth.currentUser) {
+      toast.error("로그인 정보가 없습니다.");
+      return;
+    }
+
+    // 1. 사용자 확인 (파괴적인 작업이므로 재확인 필수)
+    if (!confirm("정말로 계정을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없으며 모든 데이터가 사라집니다.")) {
+      return;
+    }
+
+    try {
+      // 2. Firebase 계정 삭제
+      await deleteUser(auth.currentUser);
+      
+      // 3. 로컬 데이터 초기화
+      localStorage.clear();
+      
+      toast.success("계정이 성공적으로 삭제되었습니다.");
+      
+      // 4. 화면 새로고침 (로그인 화면으로 이동)
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+
+    } catch (error: any) {
+      console.error(error);
+      // 보안상 오래된 세션에서는 삭제가 불가능할 수 있음 -> 재로그인 유도
+      if (error.code === 'auth/requires-recent-login') {
+        toast.error("보안을 위해 로그아웃 후 다시 로그인해서 시도해주세요.");
+      } else {
+        toast.error("계정 삭제 실패: " + error.message);
+      }
     }
   };
   
@@ -71,7 +111,6 @@ export function DashboardScreen({ onNewQuestion }: DashboardScreenProps) {
           
           {/* 우측 상단 버튼 그룹 */}
           <div className="flex items-center gap-2">
-            {/* 🟢 모델명 표시 배지 (추가된 부분) */}
             <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-xl text-xs font-bold border border-emerald-200 dark:border-emerald-800 transition-all">
               <Cpu className="w-3.5 h-3.5" />
               <span>{currentModel}</span>
@@ -79,9 +118,18 @@ export function DashboardScreen({ onNewQuestion }: DashboardScreenProps) {
 
             <LanguageToggle />
             
+            {/* 🟢 계정 삭제 버튼 */}
+            <button
+              onClick={handleDeleteAccount}
+              className="p-2 rounded-xl bg-white/50 dark:bg-gray-800/50 hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-600 transition-colors border border-gray-200 dark:border-gray-700"
+              title="회원 탈퇴"
+            >
+              <UserX className="w-4 h-4" />
+            </button>
+
             <button
               onClick={handleLogout}
-              className="p-2 rounded-xl bg-white/50 dark:bg-gray-800/50 hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-500 hover:text-red-500 transition-colors border border-gray-200 dark:border-gray-700"
+              className="p-2 rounded-xl bg-white/50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors border border-gray-200 dark:border-gray-700"
               title="로그아웃"
             >
               <LogOut className="w-4 h-4" />

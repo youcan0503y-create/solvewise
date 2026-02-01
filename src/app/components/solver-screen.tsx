@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { ArrowLeft, Camera, Send, Sparkles, X, BarChart2, Wand2 } from "lucide-react";
+import { ArrowLeft, Camera, Send, Sparkles, X, BarChart2, Wand2, Cpu } from "lucide-react"; // 🟢 Cpu 아이콘 추가
 import { useLanguage } from "@/app/components/language-context";
-// LanguageToggle 임포트 제거 (더 이상 사용하지 않음)
-import { callGemini, resizeImage, INITIAL_PROMPT, GRAPH_PROMPT } from "@/lib/gemini";
+// import { LanguageToggle } from "@/app/components/language-toggle"; // 사용 안함
+import { callGemini, resizeImage, checkCurrentModel, INITIAL_PROMPT, GRAPH_PROMPT } from "@/lib/gemini"; // 🟢 checkCurrentModel 추가
 import { Storage } from "@/lib/storage";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
@@ -40,6 +40,7 @@ export function SolverScreen({ onBack }: SolverScreenProps) {
   const [graphLoadingId, setGraphLoadingId] = useState<string | null>(null);
   const [showGraph, setShowGraph] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [currentModel, setCurrentModel] = useState<string>(""); // 🟢 모델명 상태 추가
   
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -48,6 +49,16 @@ export function SolverScreen({ onBack }: SolverScreenProps) {
       scrollRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages, isProcessing, graphLoadingId, showGraph]);
+
+  // 🟢 현재 모델명 확인 (마운트 시 실행)
+  useEffect(() => {
+    const apiKey = Storage.getApiKey();
+    if (apiKey) {
+      checkCurrentModel(apiKey).then(modelName => {
+        setCurrentModel(modelName);
+      });
+    }
+  }, []);
 
   // 진행률 애니메이션
   useEffect(() => {
@@ -218,7 +229,6 @@ export function SolverScreen({ onBack }: SolverScreenProps) {
             <ArrowLeft className="w-5 h-5 text-gray-700 dark:text-gray-300" />
           </motion.button>
           
-          {/* 🟢 텍스트 컨테이너 (언어 토글 제거 및 스타일 보정) */}
           <div className="flex-1 min-w-0">
             <h2 className="tracking-tight font-bold text-gray-900 dark:text-white truncate">
               {t("solver.title")}
@@ -227,8 +237,13 @@ export function SolverScreen({ onBack }: SolverScreenProps) {
               {t("solver.subtitle")}
             </p>
           </div>
+
+          {/* 🟢 우측 상단 모델명 배지 추가 (ml-auto로 오른쪽 끝으로 밀기) */}
+          <div className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-xl text-xs font-bold border border-emerald-200 dark:border-emerald-800 shadow-sm whitespace-nowrap">
+            <Cpu className="w-3.5 h-3.5" />
+            <span>{currentModel || "Loading..."}</span>
+          </div>
           
-          {/* 언어 토글이 있던 자리가 비워짐 -> 자연스럽게 제목이 공간 차지 */}
         </div>
       </motion.div>
 

@@ -21,9 +21,8 @@ export function DashboardScreen({ onNewQuestion }: DashboardScreenProps) {
   const { language, t } = useLanguage();
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [currentModel, setCurrentModel] = useState<string>("Checking...");
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false); // 🟢 설정 메뉴 토글 상태
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  // 메뉴 외부 클릭 감지를 위한 Ref
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -36,7 +35,6 @@ export function DashboardScreen({ onNewQuestion }: DashboardScreenProps) {
       });
     }
 
-    // 외부 클릭 시 메뉴 닫기 이벤트
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setIsSettingsOpen(false);
@@ -93,7 +91,6 @@ export function DashboardScreen({ onNewQuestion }: DashboardScreenProps) {
     <div className="min-h-screen pb-24 bg-[#fafbfc] dark:bg-[#030213]">
       <Toaster position="top-center" />
       
-      {/* 헤더 영역 */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -110,50 +107,49 @@ export function DashboardScreen({ onNewQuestion }: DashboardScreenProps) {
             </div>
           </div>
           
-          {/* 우측 상단 컨트롤 영역 */}
           <div className="flex items-center gap-3" ref={menuRef}>
-            {/* 모델명 배지 (화면 넓을 때만 표시) */}
             <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-xl text-xs font-bold border border-emerald-200 dark:border-emerald-800 transition-all">
               <Cpu className="w-3.5 h-3.5" />
               <span>{currentModel}</span>
             </div>
 
-            {/* 🟢 설정 버튼 (애니메이션 적용) */}
             <div className="relative">
-              <motion.button
+              {/* 🟢 수정됨: 버튼 자체는 회전하지 않음 */}
+              <button
                 onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-                className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm z-50 relative"
-                animate={{ rotate: isSettingsOpen ? 180 : 0 }} // 🟢 180도 회전 애니메이션
-                transition={{ duration: 0.3, ease: "easeInOut" }} // 🟢 가속도 설정
+                className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm z-50 relative overflow-hidden"
               >
-                <Settings className="w-5 h-5" />
-              </motion.button>
+                {/* 🟢 수정됨: 내부 아이콘만 회전 */}
+                <motion.div
+                  animate={{ rotate: isSettingsOpen ? 180 : 0 }}
+                  transition={{ duration: 0.3, ease: "easeInOut" }}
+                >
+                  <Settings className="w-5 h-5" />
+                </motion.div>
+              </button>
 
-              {/* 🟢 드롭다운 메뉴 (슬라이드 애니메이션) */}
               <AnimatePresence>
                 {isSettingsOpen && (
                   <motion.div
                     initial={{ opacity: 0, y: -10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                    transition={{ duration: 0.2, ease: "easeInOut" }} // 🟢 부드러운 슬라이드
+                    transition={{ duration: 0.2, ease: "easeInOut" }}
                     className="absolute right-0 top-14 w-64 bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl rounded-2xl border border-gray-200 dark:border-gray-700 shadow-xl overflow-hidden z-40 p-2 flex flex-col gap-1"
                   >
-                    {/* 메뉴 1: 모델 정보 (모바일용) */}
                     <div className="sm:hidden flex items-center gap-2 px-3 py-2 text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl mb-1">
                       <Cpu className="w-3.5 h-3.5" />
                       <span className="font-semibold truncate">{currentModel}</span>
                     </div>
 
-                    {/* 메뉴 2: 언어 설정 */}
                     <div className="px-3 py-2">
                       <p className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">언어 설정</p>
+                      {/* 🟢 언어 토글 컴포넌트 호출 */}
                       <LanguageToggle />
                     </div>
 
                     <div className="h-px bg-gray-100 dark:bg-gray-800 my-1" />
 
-                    {/* 메뉴 3: 계정 관리 */}
                     <button
                       onClick={handleLogout}
                       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
@@ -177,7 +173,6 @@ export function DashboardScreen({ onNewQuestion }: DashboardScreenProps) {
         </div>
       </motion.div>
 
-      {/* 질문 리스트 영역 */}
       <div className="max-w-2xl mx-auto px-6 pt-6 space-y-4">
         {history.length === 0 ? (
           <motion.div 

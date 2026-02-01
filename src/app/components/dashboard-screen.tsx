@@ -8,16 +8,14 @@ import { checkCurrentModel } from "@/lib/gemini";
 import { formatDistanceToNow } from "date-fns";
 import { ko, enUS } from "date-fns/locale";
 import { Toaster, toast } from "sonner";
-
-// Firebase 관련 임포트
 import { auth } from "@/lib/firebase";
 import { deleteUser } from "firebase/auth";
 
 interface DashboardScreenProps {
-  onNewQuestion: () => void;
+  onNavigate: (item?: HistoryItem) => void; // 🟢 수정됨: 아이템을 받을 수 있도록 변경
 }
 
-export function DashboardScreen({ onNewQuestion }: DashboardScreenProps) {
+export function DashboardScreen({ onNavigate }: DashboardScreenProps) {
   const { language, t } = useLanguage();
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [currentModel, setCurrentModel] = useState<string>("Checking...");
@@ -114,12 +112,10 @@ export function DashboardScreen({ onNewQuestion }: DashboardScreenProps) {
             </div>
 
             <div className="relative">
-              {/* 🟢 수정됨: 버튼 자체는 회전하지 않음 */}
               <button
                 onClick={() => setIsSettingsOpen(!isSettingsOpen)}
                 className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm z-50 relative overflow-hidden"
               >
-                {/* 🟢 수정됨: 내부 아이콘만 회전 */}
                 <motion.div
                   animate={{ rotate: isSettingsOpen ? 180 : 0 }}
                   transition={{ duration: 0.3, ease: "easeInOut" }}
@@ -144,7 +140,6 @@ export function DashboardScreen({ onNewQuestion }: DashboardScreenProps) {
 
                     <div className="px-3 py-2">
                       <p className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">언어 설정</p>
-                      {/* 🟢 언어 토글 컴포넌트 호출 */}
                       <LanguageToggle />
                     </div>
 
@@ -198,7 +193,8 @@ export function DashboardScreen({ onNewQuestion }: DashboardScreenProps) {
                 whileHover={{ scale: 1.01, y: -2 }}
                 whileTap={{ scale: 0.99 }}
                 className="group cursor-pointer relative"
-                onClick={() => {}} 
+                // 🟢 클릭 시 해당 아이템 데이터를 가지고 이동
+                onClick={() => onNavigate(item)} 
               >
                 <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm rounded-[24px] p-5 border border-white/50 dark:border-gray-800 shadow-sm hover:shadow-md transition-all">
                   <div className="flex items-start gap-4">
@@ -250,7 +246,7 @@ export function DashboardScreen({ onNewQuestion }: DashboardScreenProps) {
         animate={{ scale: 1 }}
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.95 }}
-        onClick={onNewQuestion}
+        onClick={() => onNavigate()} // 🟢 빈 값으로 호출 = 새 질문
         className="fixed bottom-8 right-8 w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent shadow-lg shadow-primary/40 flex items-center justify-center text-white z-50 hover:shadow-xl hover:shadow-primary/50 transition-shadow"
       >
         <Plus className="w-7 h-7" />

@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { ArrowLeft, Camera, Send, Sparkles, X, BarChart2, Wand2, Cpu } from "lucide-react"; // 🟢 Cpu 아이콘 추가
+import { ArrowLeft, Camera, Send, Sparkles, X, BarChart2, Wand2, Cpu } from "lucide-react";
 import { useLanguage } from "@/app/components/language-context";
-// import { LanguageToggle } from "@/app/components/language-toggle"; // 사용 안함
-import { callGemini, resizeImage, checkCurrentModel, INITIAL_PROMPT, GRAPH_PROMPT } from "@/lib/gemini"; // 🟢 checkCurrentModel 추가
-import { Storage } from "@/lib/storage";
+import { callGemini, resizeImage, checkCurrentModel, INITIAL_PROMPT, GRAPH_PROMPT } from "@/lib/gemini";
+import { Storage, HistoryItem } from "@/lib/storage"; // HistoryItem 임포트 추가
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
@@ -18,6 +17,7 @@ declare global {
 
 interface SolverScreenProps {
   onBack: () => void;
+  initialHistory: HistoryItem | null; // 🟢 초기 데이터 Props 추가
 }
 
 interface ParsedSection {
@@ -33,16 +33,40 @@ interface ChatMessage {
   result?: { explanation: string; graphCode: string };
 }
 
-export function SolverScreen({ onBack }: SolverScreenProps) {
+export function SolverScreen({ onBack, initialHistory }: SolverScreenProps) {
   const { t } = useLanguage();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [graphLoadingId, setGraphLoadingId] = useState<string | null>(null);
   const [showGraph, setShowGraph] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [currentModel, setCurrentModel] = useState<string>(""); // 🟢 모델명 상태 추가
+  const [currentModel, setCurrentModel] = useState<string>("");
   
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // 🟢 초기 히스토리 데이터 복구 로직
+  useEffect(() => {
+    if (initialHistory) {
+      setMessages([
+        {
+          id: 'restored-user',
+          role: 'user',
+          text: initialHistory.question,
+          image: initialHistory.previewImage,
+        },
+        {
+          id: 'restored-ai',
+          role: 'ai',
+          result: {
+            explanation: initialHistory.answer,
+            graphCode: initialHistory.graphCode || "",
+          },
+        }
+      ]);
+    } else {
+      setMessages([]); // 새 질문일 경우 초기화
+    }
+  }, [initialHistory]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -50,7 +74,6 @@ export function SolverScreen({ onBack }: SolverScreenProps) {
     }
   }, [messages, isProcessing, graphLoadingId, showGraph]);
 
-  // 🟢 현재 모델명 확인 (마운트 시 실행)
   useEffect(() => {
     const apiKey = Storage.getApiKey();
     if (apiKey) {
@@ -60,7 +83,6 @@ export function SolverScreen({ onBack }: SolverScreenProps) {
     }
   }, []);
 
-  // 진행률 애니메이션
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isProcessing) {
@@ -140,6 +162,7 @@ export function SolverScreen({ onBack }: SolverScreenProps) {
       };
       setMessages(prev => [...prev, newAiMsg]);
 
+      // 히스토리 저장은 '첫 질문'일 때만 수행 (대화 전체 저장은 별도 로직 필요)
       if (messages.length === 0) {
         Storage.addHistory({
           id: Date.now().toString(),
@@ -238,7 +261,6 @@ export function SolverScreen({ onBack }: SolverScreenProps) {
             </p>
           </div>
 
-          {/* 🟢 우측 상단 모델명 배지 추가 (ml-auto로 오른쪽 끝으로 밀기) */}
           <div className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-xl text-xs font-bold border border-emerald-200 dark:border-emerald-800 shadow-sm whitespace-nowrap">
             <Cpu className="w-3.5 h-3.5" />
             <span>{currentModel || "Loading..."}</span>
@@ -400,6 +422,7 @@ export function SolverScreen({ onBack }: SolverScreenProps) {
   );
 }
 
+// ... InputCard, ResultCard 컴포넌트들은 기존과 동일하게 유지됩니다 ...
 function InputCard({ onSend, isProcessing, isCompact = false }: { 
   onSend: (text: string, file: File | null, base64: string | null) => void, 
   isProcessing: boolean,

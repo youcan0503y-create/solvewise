@@ -3,15 +3,15 @@ import { LanguageProvider } from "@/app/components/language-context";
 import { LoginScreen } from "@/app/components/login-screen";
 import { DashboardScreen } from "@/app/components/dashboard-screen";
 import { SolverScreen } from "@/app/components/solver-screen";
-import { Storage } from "@/lib/storage";
-import { AnimatePresence, motion } from "motion/react"; // 🟢 애니메이션 모듈 추가
+import { Storage, HistoryItem } from "@/lib/storage"; // HistoryItem 타입 임포트
+import { AnimatePresence, motion } from "motion/react";
 
 type Screen = "login" | "dashboard" | "solver";
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>("login");
+  const [selectedHistory, setSelectedHistory] = useState<HistoryItem | null>(null); // 🟢 선택된 기록 상태
 
-  // 앱 시작 시 로그인 여부 확인
   useEffect(() => {
     const apiKey = Storage.getApiKey();
     if (apiKey) {
@@ -19,46 +19,25 @@ export default function App() {
     }
   }, []);
 
-  // 🟢 화면 전환 애니메이션 설정 (iOS 스타일의 부드러운 감속)
+  // 🟢 대시보드 -> 솔버 이동 핸들러 (새 질문 or 기록 불러오기)
+  const handleNavigateToSolver = (item?: HistoryItem) => {
+    setSelectedHistory(item || null); // 아이템이 있으면 저장, 없으면 null (새 질문)
+    setCurrentScreen("solver");
+  };
+
   const pageVariants = {
-    initial: {
-      opacity: 0,
-      y: 20, // 아래에서
-      scale: 0.98, // 살짝 작게 시작
-    },
-    in: {
-      opacity: 1,
-      y: 0,
-      scale: 1,
-      transition: {
-        type: "spring",
-        stiffness: 300,
-        damping: 30,
-        mass: 1,
-      },
-    },
-    out: {
-      opacity: 0,
-      y: -20, // 위로 사라짐
-      scale: 0.98,
-      transition: {
-        duration: 0.2,
-        ease: "easeInOut",
-      },
-    },
+    initial: { opacity: 0, y: 20, scale: 0.98 },
+    in: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 300, damping: 30, mass: 1 } },
+    out: { opacity: 0, y: -20, scale: 0.98, transition: { duration: 0.2, ease: "easeInOut" } },
   };
 
   return (
     <LanguageProvider>
       <div className="min-h-screen bg-background text-foreground font-sans antialiased overflow-hidden">
-        {/* 
-          mode="wait": 이전 화면이 완전히 사라진 후 다음 화면이 나옵니다. 
-          화면이 겹치는 것을 방지하여 깔끔하게 전환됩니다.
-        */}
         <AnimatePresence mode="wait">
           {currentScreen === "login" && (
             <motion.div
-              key="login" // 🟢 key가 달라야 애니메이션이 작동함
+              key="login"
               variants={pageVariants}
               initial="initial"
               animate="in"
@@ -78,7 +57,8 @@ export default function App() {
               exit="out"
               className="w-full h-full"
             >
-              <DashboardScreen onNewQuestion={() => setCurrentScreen("solver")} />
+              {/* 🟢 수정됨: onNavigate 전달 */}
+              <DashboardScreen onNavigate={handleNavigateToSolver} />
             </motion.div>
           )}
 
@@ -91,7 +71,11 @@ export default function App() {
               exit="out"
               className="w-full h-full"
             >
-              <SolverScreen onBack={() => setCurrentScreen("dashboard")} />
+              {/* 🟢 수정됨: initialHistory 전달 */}
+              <SolverScreen 
+                onBack={() => setCurrentScreen("dashboard")} 
+                initialHistory={selectedHistory}
+              />
             </motion.div>
           )}
         </AnimatePresence>

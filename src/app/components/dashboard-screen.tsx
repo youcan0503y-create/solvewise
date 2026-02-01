@@ -12,7 +12,7 @@ import { auth } from "@/lib/firebase";
 import { deleteUser } from "firebase/auth";
 
 interface DashboardScreenProps {
-  onNavigate: (item?: HistoryItem) => void; // 🟢 수정됨: 아이템을 받을 수 있도록 변경
+  onNavigate: (item?: HistoryItem) => void;
 }
 
 export function DashboardScreen({ onNavigate }: DashboardScreenProps) {
@@ -44,16 +44,16 @@ export function DashboardScreen({ onNavigate }: DashboardScreenProps) {
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (confirm("정말 삭제하시겠습니까?")) {
+    if (confirm(t("dashboard.delete_confirm"))) {
       const newHistory = history.filter(item => item.id !== id);
       setHistory(newHistory);
       localStorage.setItem("solvewise_history", JSON.stringify(newHistory));
-      toast.success("삭제되었습니다.");
+      toast.success(t("dashboard.deleted"));
     }
   };
 
   const handleLogout = () => {
-    if (confirm("로그아웃 하시겠습니까?")) {
+    if (confirm(t("dashboard.logout_confirm"))) {
       localStorage.removeItem("solvewise_api_key");
       auth.signOut();
       window.location.reload();
@@ -62,25 +62,25 @@ export function DashboardScreen({ onNavigate }: DashboardScreenProps) {
 
   const handleDeleteAccount = async () => {
     if (!auth.currentUser) {
-      toast.error("로그인 정보가 없습니다.");
+      toast.error("Error: No user");
       return;
     }
-    if (!confirm("정말로 계정을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없으며 모든 데이터가 사라집니다.")) {
+    if (!confirm(t("dashboard.account_delete_confirm"))) {
       return;
     }
     try {
       await deleteUser(auth.currentUser);
       localStorage.clear();
-      toast.success("계정이 성공적으로 삭제되었습니다.");
+      toast.success(t("dashboard.account_deleted"));
       setTimeout(() => {
         window.location.reload();
       }, 1000);
     } catch (error: any) {
       console.error(error);
       if (error.code === 'auth/requires-recent-login') {
-        toast.error("보안을 위해 로그아웃 후 다시 로그인해서 시도해주세요.");
+        toast.error("Please log in again to delete your account.");
       } else {
-        toast.error("계정 삭제 실패: " + error.message);
+        toast.error("Error: " + error.message);
       }
     }
   };
@@ -139,7 +139,7 @@ export function DashboardScreen({ onNavigate }: DashboardScreenProps) {
                     </div>
 
                     <div className="px-3 py-2">
-                      <p className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">언어 설정</p>
+                      <p className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">{t("dashboard.settings_language")}</p>
                       <LanguageToggle />
                     </div>
 
@@ -150,7 +150,7 @@ export function DashboardScreen({ onNavigate }: DashboardScreenProps) {
                       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                     >
                       <LogOut className="w-4 h-4" />
-                      로그아웃
+                      {t("dashboard.logout")}
                     </button>
 
                     <button
@@ -158,7 +158,7 @@ export function DashboardScreen({ onNavigate }: DashboardScreenProps) {
                       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                     >
                       <UserX className="w-4 h-4" />
-                      회원 탈퇴
+                      {t("dashboard.delete_account")}
                     </button>
                   </motion.div>
                 )}
@@ -178,8 +178,8 @@ export function DashboardScreen({ onNavigate }: DashboardScreenProps) {
             <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
               <Sparkles className="w-8 h-8 text-gray-400" />
             </div>
-            <p className="text-lg font-medium text-gray-600 dark:text-gray-400">아직 기록이 없습니다.</p>
-            <p className="text-sm mt-1">우측 하단 버튼을 눌러 질문을 시작해보세요!</p>
+            <p className="text-lg font-medium text-gray-600 dark:text-gray-400">{t("dashboard.no_history")}</p>
+            <p className="text-sm mt-1">{t("dashboard.start_prompt")}</p>
           </motion.div>
         ) : (
           <AnimatePresence>
@@ -193,7 +193,6 @@ export function DashboardScreen({ onNavigate }: DashboardScreenProps) {
                 whileHover={{ scale: 1.01, y: -2 }}
                 whileTap={{ scale: 0.99 }}
                 className="group cursor-pointer relative"
-                // 🟢 클릭 시 해당 아이템 데이터를 가지고 이동
                 onClick={() => onNavigate(item)} 
               >
                 <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm rounded-[24px] p-5 border border-white/50 dark:border-gray-800 shadow-sm hover:shadow-md transition-all">
@@ -208,7 +207,7 @@ export function DashboardScreen({ onNavigate }: DashboardScreenProps) {
 
                     <div className="flex-1 min-w-0">
                       <p className="text-gray-900 dark:text-gray-100 font-medium mb-1 line-clamp-2 text-sm sm:text-base">
-                        {item.question || (item.type === "image" ? "이미지 분석 질문" : "텍스트 질문")}
+                        {item.question || (item.type === "image" ? t("dashboard.image_question") : t("dashboard.text_question"))}
                       </p>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         <div className="flex items-center gap-1">
@@ -246,7 +245,7 @@ export function DashboardScreen({ onNavigate }: DashboardScreenProps) {
         animate={{ scale: 1 }}
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.95 }}
-        onClick={() => onNavigate()} // 🟢 빈 값으로 호출 = 새 질문
+        onClick={() => onNavigate()}
         className="fixed bottom-8 right-8 w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent shadow-lg shadow-primary/40 flex items-center justify-center text-white z-50 hover:shadow-xl hover:shadow-primary/50 transition-shadow"
       >
         <Plus className="w-7 h-7" />

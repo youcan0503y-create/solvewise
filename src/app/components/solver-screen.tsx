@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { ArrowLeft, Camera, Send, Sparkles, X, BarChart2, Wand2, Cpu } from "lucide-react";
 import { useLanguage } from "@/app/components/language-context";
 import { callGemini, resizeImage, checkCurrentModel, INITIAL_PROMPT, GRAPH_PROMPT } from "@/lib/gemini";
-import { Storage, HistoryItem } from "@/lib/storage"; // HistoryItem 임포트 추가
+import { Storage, HistoryItem } from "@/lib/storage";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
@@ -17,7 +17,7 @@ declare global {
 
 interface SolverScreenProps {
   onBack: () => void;
-  initialHistory: HistoryItem | null; // 🟢 초기 데이터 Props 추가
+  initialHistory: HistoryItem | null;
 }
 
 interface ParsedSection {
@@ -44,7 +44,6 @@ export function SolverScreen({ onBack, initialHistory }: SolverScreenProps) {
   
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // 🟢 초기 히스토리 데이터 복구 로직
   useEffect(() => {
     if (initialHistory) {
       setMessages([
@@ -64,7 +63,7 @@ export function SolverScreen({ onBack, initialHistory }: SolverScreenProps) {
         }
       ]);
     } else {
-      setMessages([]); // 새 질문일 경우 초기화
+      setMessages([]);
     }
   }, [initialHistory]);
 
@@ -124,7 +123,7 @@ export function SolverScreen({ onBack, initialHistory }: SolverScreenProps) {
   const handleSend = async (inputText: string, imageFile: File | null, imageBase64: string | null) => {
     const apiKey = Storage.getApiKey();
     if (!apiKey) {
-      toast.error("API Key가 없습니다. 다시 로그인해주세요.");
+      toast.error(t("solver.error_no_key"));
       return;
     }
 
@@ -162,12 +161,11 @@ export function SolverScreen({ onBack, initialHistory }: SolverScreenProps) {
       };
       setMessages(prev => [...prev, newAiMsg]);
 
-      // 히스토리 저장은 '첫 질문'일 때만 수행 (대화 전체 저장은 별도 로직 필요)
       if (messages.length === 0) {
         Storage.addHistory({
           id: Date.now().toString(),
           type: imageFile ? "image" : "text",
-          question: inputText || "이미지 분석 질문",
+          question: inputText || t("dashboard.image_question"),
           answer: data.explanation,
           graphCode: data.graphCode,
           timestamp: Date.now(),
@@ -177,7 +175,7 @@ export function SolverScreen({ onBack, initialHistory }: SolverScreenProps) {
 
     } catch (error: any) {
       console.error(error);
-      toast.error("오류가 발생했습니다: " + error.message);
+      toast.error("오류: " + error.message);
     } finally {
       setIsProcessing(false);
     }
@@ -207,12 +205,12 @@ export function SolverScreen({ onBack, initialHistory }: SolverScreenProps) {
           return msg;
         }));
         setShowGraph(true);
-        toast.success("그래프가 생성되었습니다!");
+        toast.success(t("solver.graph_success"));
       } else {
-        toast.error("그래프 코드를 생성하지 못했습니다.");
+        toast.error(t("solver.graph_error"));
       }
     } catch (error: any) {
-      toast.error("그래프 생성 실패: " + error.message);
+      toast.error("오류: " + error.message);
     } finally {
       setGraphLoadingId(null);
     }
@@ -236,7 +234,6 @@ export function SolverScreen({ onBack, initialHistory }: SolverScreenProps) {
     <div className="min-h-screen flex flex-col bg-[#fafbfc] dark:bg-[#030213]">
       <Toaster position="top-center" />
 
-      {/* 헤더 */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -310,13 +307,10 @@ export function SolverScreen({ onBack, initialHistory }: SolverScreenProps) {
 
                 {msg.role === 'ai' && msg.result && (
                   <div className="w-full space-y-6">
-                    
-                    {/* 1. 텍스트 결과 카드들 */}
                     {parseResponse(msg.result.explanation).map((section, idx) => (
                       <ResultCard key={idx} section={section} index={idx} />
                     ))}
 
-                    {/* 2. 그래프 버튼 및 영역 */}
                     <div className="flex flex-col gap-4">
                       <div className="flex justify-end">
                         {msg.result.graphCode ? (
@@ -329,7 +323,7 @@ export function SolverScreen({ onBack, initialHistory }: SolverScreenProps) {
                             }`}
                           >
                             <BarChart2 className="w-4 h-4" />
-                            {showGraph ? "그래프 숨기기" : "그래프 보기"}
+                            {showGraph ? t("solver.graph_hide") : t("solver.graph_view")}
                           </button>
                         ) : (
                           <button
@@ -340,12 +334,12 @@ export function SolverScreen({ onBack, initialHistory }: SolverScreenProps) {
                             {graphLoadingId === msg.id ? (
                               <>
                                 <Sparkles className="w-4 h-4 animate-spin" />
-                                <span>생성 중...</span>
+                                <span>{t("solver.graph_creating")}</span>
                               </>
                             ) : (
                               <>
                                 <Wand2 className="w-4 h-4" />
-                                <span>시각화 코드 생성</span>
+                                <span>{t("solver.graph_create")}</span>
                               </>
                             )}
                           </button>
@@ -381,7 +375,7 @@ export function SolverScreen({ onBack, initialHistory }: SolverScreenProps) {
                   <div className="w-8 h-8 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-sm border border-gray-100 dark:border-gray-700">
                     <Sparkles className="w-4 h-4 animate-pulse text-primary" />
                   </div>
-                  <span className="text-sm font-bold">분석중</span>
+                  <span className="text-sm font-bold">{t("solver.solving")}</span>
                   <span className="text-xs text-muted-foreground ml-auto">{Math.round(progress)}%</span>
                 </div>
                 
@@ -409,7 +403,7 @@ export function SolverScreen({ onBack, initialHistory }: SolverScreenProps) {
               >
                 <div className="flex items-center gap-2 mb-2 px-2">
                   <Sparkles className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-bold text-primary">추가 질문하기</span>
+                  <span className="text-sm font-bold text-primary">{t("solver.add_question")}</span>
                 </div>
                 <InputCard onSend={handleSend} isProcessing={isProcessing} isCompact={true} />
               </motion.div>
@@ -422,7 +416,6 @@ export function SolverScreen({ onBack, initialHistory }: SolverScreenProps) {
   );
 }
 
-// ... InputCard, ResultCard 컴포넌트들은 기존과 동일하게 유지됩니다 ...
 function InputCard({ onSend, isProcessing, isCompact = false }: { 
   onSend: (text: string, file: File | null, base64: string | null) => void, 
   isProcessing: boolean,
@@ -477,7 +470,7 @@ function InputCard({ onSend, isProcessing, isCompact = false }: {
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder={isCompact ? "추가 질문을 입력하세요..." : t("solver.placeholder")}
+        placeholder={isCompact ? t("solver.placeholder") : t("solver.placeholder")}
         className={`w-full bg-transparent resize-none outline-none text-gray-900 dark:text-gray-100 placeholder:text-gray-400 text-base ${isCompact ? 'min-h-[60px]' : 'min-h-[100px]'}`}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) {

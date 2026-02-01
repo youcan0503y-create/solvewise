@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Plus, Clock, Image as ImageIcon, Type, ChevronRight, Trash2, Sparkles, LogOut, Cpu, UserX } from "lucide-react"; // 🟢 UserX 아이콘 추가
+import { Plus, Clock, Image as ImageIcon, Type, ChevronRight, Trash2, Sparkles, LogOut, Cpu, UserX, Settings } from "lucide-react";
 import { useLanguage } from "@/app/components/language-context";
 import { LanguageToggle } from "@/app/components/language-toggle";
 import { Storage, HistoryItem } from "@/lib/storage";
@@ -9,7 +9,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ko, enUS } from "date-fns/locale";
 import { Toaster, toast } from "sonner";
 
-// 🟢 Firebase 관련 임포트 추가
+// Firebase 관련 임포트
 import { auth } from "@/lib/firebase";
 import { deleteUser } from "firebase/auth";
 
@@ -21,6 +21,10 @@ export function DashboardScreen({ onNewQuestion }: DashboardScreenProps) {
   const { language, t } = useLanguage();
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [currentModel, setCurrentModel] = useState<string>("Checking...");
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false); // 🟢 설정 메뉴 토글 상태
+
+  // 메뉴 외부 클릭 감지를 위한 Ref
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setHistory(Storage.getHistory());
@@ -31,6 +35,15 @@ export function DashboardScreen({ onNewQuestion }: DashboardScreenProps) {
         setCurrentModel(modelName);
       });
     }
+
+    // 외부 클릭 시 메뉴 닫기 이벤트
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsSettingsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
@@ -46,40 +59,28 @@ export function DashboardScreen({ onNewQuestion }: DashboardScreenProps) {
   const handleLogout = () => {
     if (confirm("로그아웃 하시겠습니까?")) {
       localStorage.removeItem("solvewise_api_key");
-      auth.signOut(); // Firebase 로그아웃
+      auth.signOut();
       window.location.reload();
     }
   };
 
-  // 🟢 계정 삭제 핸들러
   const handleDeleteAccount = async () => {
     if (!auth.currentUser) {
       toast.error("로그인 정보가 없습니다.");
       return;
     }
-
-    // 1. 사용자 확인 (파괴적인 작업이므로 재확인 필수)
     if (!confirm("정말로 계정을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없으며 모든 데이터가 사라집니다.")) {
       return;
     }
-
     try {
-      // 2. Firebase 계정 삭제
       await deleteUser(auth.currentUser);
-      
-      // 3. 로컬 데이터 초기화
       localStorage.clear();
-      
       toast.success("계정이 성공적으로 삭제되었습니다.");
-      
-      // 4. 화면 새로고침 (로그인 화면으로 이동)
       setTimeout(() => {
         window.location.reload();
       }, 1000);
-
     } catch (error: any) {
       console.error(error);
-      // 보안상 오래된 세션에서는 삭제가 불가능할 수 있음 -> 재로그인 유도
       if (error.code === 'auth/requires-recent-login') {
         toast.error("보안을 위해 로그아웃 후 다시 로그인해서 시도해주세요.");
       } else {
@@ -98,7 +99,7 @@ export function DashboardScreen({ onNewQuestion }: DashboardScreenProps) {
         animate={{ opacity: 1, y: 0 }}
         className="sticky top-0 z-10 backdrop-blur-xl bg-white/70 dark:bg-black/70 border-b border-gray-200/50 dark:border-gray-800/50 px-6 py-4"
       >
-        <div className="max-w-2xl mx-auto flex items-center justify-between">
+        <div className="max-w-2xl mx-auto flex items-center justify-between relative">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-[14px] bg-gradient-to-br from-primary to-accent shadow-md flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-white" />
@@ -109,31 +110,69 @@ export function DashboardScreen({ onNewQuestion }: DashboardScreenProps) {
             </div>
           </div>
           
-          {/* 우측 상단 버튼 그룹 */}
-          <div className="flex items-center gap-2">
+          {/* 우측 상단 컨트롤 영역 */}
+          <div className="flex items-center gap-3" ref={menuRef}>
+            {/* 모델명 배지 (화면 넓을 때만 표시) */}
             <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-xl text-xs font-bold border border-emerald-200 dark:border-emerald-800 transition-all">
               <Cpu className="w-3.5 h-3.5" />
               <span>{currentModel}</span>
             </div>
 
-            <LanguageToggle />
-            
-            {/* 🟢 계정 삭제 버튼 */}
-            <button
-              onClick={handleDeleteAccount}
-              className="p-2 rounded-xl bg-white/50 dark:bg-gray-800/50 hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-600 transition-colors border border-gray-200 dark:border-gray-700"
-              title="회원 탈퇴"
-            >
-              <UserX className="w-4 h-4" />
-            </button>
+            {/* 🟢 설정 버튼 (애니메이션 적용) */}
+            <div className="relative">
+              <motion.button
+                onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm z-50 relative"
+                animate={{ rotate: isSettingsOpen ? 180 : 0 }} // 🟢 180도 회전 애니메이션
+                transition={{ duration: 0.3, ease: "easeInOut" }} // 🟢 가속도 설정
+              >
+                <Settings className="w-5 h-5" />
+              </motion.button>
 
-            <button
-              onClick={handleLogout}
-              className="p-2 rounded-xl bg-white/50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors border border-gray-200 dark:border-gray-700"
-              title="로그아웃"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
+              {/* 🟢 드롭다운 메뉴 (슬라이드 애니메이션) */}
+              <AnimatePresence>
+                {isSettingsOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                    transition={{ duration: 0.2, ease: "easeInOut" }} // 🟢 부드러운 슬라이드
+                    className="absolute right-0 top-14 w-64 bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl rounded-2xl border border-gray-200 dark:border-gray-700 shadow-xl overflow-hidden z-40 p-2 flex flex-col gap-1"
+                  >
+                    {/* 메뉴 1: 모델 정보 (모바일용) */}
+                    <div className="sm:hidden flex items-center gap-2 px-3 py-2 text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl mb-1">
+                      <Cpu className="w-3.5 h-3.5" />
+                      <span className="font-semibold truncate">{currentModel}</span>
+                    </div>
+
+                    {/* 메뉴 2: 언어 설정 */}
+                    <div className="px-3 py-2">
+                      <p className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">언어 설정</p>
+                      <LanguageToggle />
+                    </div>
+
+                    <div className="h-px bg-gray-100 dark:bg-gray-800 my-1" />
+
+                    {/* 메뉴 3: 계정 관리 */}
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      로그아웃
+                    </button>
+
+                    <button
+                      onClick={handleDeleteAccount}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                    >
+                      <UserX className="w-4 h-4" />
+                      회원 탈퇴
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
       </motion.div>

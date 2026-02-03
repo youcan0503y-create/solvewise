@@ -1,23 +1,24 @@
 // 🟢 [설정] 사용자님의 전용 지식 서버 주소
 const SEARCH_API_URL = "https://solvewise-server.onrender.com/api/search";
 
-// 🟢 [프롬프트] 강사 빙의 모드 (자료 검증 로직 추가)
+// 🟢 [프롬프트] 강사 빙의 모드 (AI 내부 필터링 로직 추가)
 export const INITIAL_PROMPT = `
 당신은 대한민국 최고의 KICPA(공인회계사) 수험생을 위한 AI 튜터 'SolveWise'입니다.
 사용자의 질문에 대해 아래 제공될 **[참고 자료(Context)]**를 바탕으로 답변하세요.
 
-**[⚠️ 중요: 자료 검증 및 행동 지침]**
-가장 먼저 **[참고 자료]**가 현재 질문을 풀기에 적합한지 스스로 판단하세요.
-1. **적합함 (DB 활용)**: 자료 안에 질문과 직결된 **'와꾸(풀이 틀)', '단계(Step)', '핵심 이론'**이 명확히 포함되어 있다면, 강사의 말투와 풀이 방식을 완벽히 모방하여 답변하세요.
-2. **부적합함 (검색 전환)**: 자료가 질문과 주제만 비슷할 뿐 구체적인 풀이 방법이 없거나 기초적인 내용뿐이라면, **과감하게 자료를 무시하고 [Google Search] 도구를 사용하여** 웹 검색 결과로 답변하세요.
+**[⚠️ 중요: 지능형 자료 선별 지침]**
+제공된 참고 자료는 약 15개의 조각입니다. 이 중에는 질문과 관련 없는 '단순 제목'이나 '서론'도 섞여 있습니다.
+1. **알맹이 찾기**: 단순히 키워드만 있는 자료는 무시하고, **구체적인 계산 공식, 단계별 논리, 강사의 핵심 팁**이 포함된 자료를 우선적으로 채택하세요.
+2. **와꾸(Frame) 적용**: 채택된 자료에서 강사의 '와꾸(문제 풀이 틀)'를 찾아 답변의 핵심으로 삼으세요.
+3. **부족 시 검색**: 15개를 다 뒤져봐도 구체적인 풀이법이 없다면, 과감하게 **Google Search**를 사용하세요.
 
 **[답변 원칙]**
-1. **와꾸(Frame) 우선**: 풀이 시 표나 LaTeX 수식으로 구조화된 '와꾸'를 가장 먼저 제시하세요.
-2. **말투 모방**: (DB 활용 시) 강사의 뉘앙스("이건 낚시야")를 섞어 쓰세요.
-3. **출처 명시**: DB 자료를 썼다면 "참고 자료"를, 웹 검색을 했다면 "웹 검색"을 출처로 밝히세요.
+1. **와꾸 우선**: 풀이 시 표나 LaTeX 수식으로 구조화된 '와꾸'를 가장 먼저 제시하세요.
+2. **말투 모방**: 강사의 뉘앙스("이건 낚시야", "돈주머니 같아")를 섞어 쓰세요.
+3. **출처 명시**: "참고 자료" 또는 "웹 검색" 중 무엇을 썼는지 밝히세요.
 `;
 
-// 🟢 [프롬프트] 웹 검색 모드 (DB 데이터 없음)
+// 🟢 [프롬프트] 웹 검색 모드
 const WEB_SEARCH_PROMPT = `
 당신은 KICPA 전문 AI 튜터입니다.
 **첨부된 이미지(또는 질문)와 관련된 내용이 내부 데이터베이스에 없습니다.**
@@ -43,7 +44,7 @@ const OUTPUT_FORMAT = `
 (이미지의 지문과 조건을 텍스트로 정리)
 
 **4. 문제 풀이 과정**
-- **[강사님 와꾸]**: (DB 자료가 유효할 때만 작성, 아니면 '표준 풀이'로 대체)
+- **[강사님 와꾸]**: (선별된 자료에 와꾸가 있을 때만 작성)
 - **반드시 각 단계를 '### 단계 N: [핵심 내용]' 형식의 제목으로 시작하세요.**
 - 계산 식이나 중요한 수식은 문장 중간에 넣지 말고, **반드시 별도의 줄에 $$ ... $$ (Display Math) 형식을 사용**하여 작성하세요.
 
@@ -51,7 +52,9 @@ const OUTPUT_FORMAT = `
 (간결하게 작성)
 `;
 
-// 🟢 그래프 생성 프롬프트
+// ... (이하 GRAPH_PROMPT, resizeImage, getSortedModels, checkCurrentModel, fetchContextFromBackend, generateSearchQueryFromImage, callGemini 함수는 기존 코드와 동일합니다. 위에서 덮어쓰기 했던 코드를 그대로 유지하세요.)
+// (아래는 편의를 위해 생략된 뒷부분 코드입니다. 기존 파일 내용을 유지하거나, 앞서 드린 전체 코드에서 INITIAL_PROMPT만 위 내용으로 바꾸셔도 됩니다.)
+
 export const GRAPH_PROMPT = `
 위 문제의 상황을 시각화하기 위한 **Plotly.js 자바스크립트 코드**를 작성하세요.
 **[중요] 그래프 설정**: 
@@ -64,7 +67,6 @@ export const GRAPH_PROMPT = `
 7. **모든 텍스트는 한국어**로 작성하세요.
 `;
 
-// 🟢 이미지 리사이징 함수
 export async function resizeImage(file: File, maxSide: number = 800): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -97,7 +99,6 @@ export async function resizeImage(file: File, maxSide: number = 800): Promise<st
   });
 }
 
-// 🟢 [핵심] 모델 필터링 및 정렬 로직
 async function getSortedModels(apiKey: string): Promise<string[]> {
   try {
     const response = await fetch(
@@ -146,7 +147,6 @@ export async function checkCurrentModel(apiKey: string): Promise<string> {
   return "No Model Found";
 }
 
-// 🟢 백엔드 지식 검색 함수
 async function fetchContextFromBackend(query: string): Promise<{ context: string, found: boolean, sources: string[] }> {
   try {
     console.log(`📡 [Backend] 검색 요청: "${query}"`);
@@ -180,7 +180,6 @@ ${item.content}
   }
 }
 
-// 🟢 [핵심] 이미지에서 최적의 검색 쿼리 생성 함수
 async function generateSearchQueryFromImage(apiKey: string, base64Image: string): Promise<string> {
   try {
     console.log("🖼️ [Vision] 이미지 분석 중... (검색 쿼리 생성)");
@@ -191,14 +190,8 @@ async function generateSearchQueryFromImage(apiKey: string, base64Image: string)
     
     const prompt = `
       이 이미지는 KICPA(회계사) 시험 문제입니다.
-      이 문제를 풀기 위해 데이터베이스에서 '강사의 풀이법(와꾸)'을 검색하려고 합니다.
-      
       이미지의 내용을 분석하여 **데이터베이스 검색에 가장 최적화된 '검색어(Query)'**를 한 문장으로 만드세요.
-      
-      [작성 규칙]
-      1. 핵심 주제(예: 차입원가, 현금흐름표)와 세부 유형(예: 자본화, 간접법)을 포함하세요.
-      2. 문제에서 묻는 핵심 질문(예: X값 구하기, 리스크 프리미엄 계산)을 포함하세요.
-      3. 잡담 없이 **검색어만** 출력하세요.
+      잡담 없이 **검색어만** 출력하세요.
     `;
 
     const response = await fetch(url, {
@@ -225,7 +218,6 @@ async function generateSearchQueryFromImage(apiKey: string, base64Image: string)
   }
 }
 
-// 🟢 [최종] AI 호출 함수 (이중 안전장치 적용)
 export async function callGemini(apiKey: string, prompt: string, base64Image: string | null) {
   const modelList = await getSortedModels(apiKey);
   if (modelList.length === 0) throw new Error("사용 가능한 AI 모델이 없습니다.");
@@ -254,7 +246,6 @@ export async function callGemini(apiKey: string, prompt: string, base64Image: st
   let headerBadge = "";
 
   if (isDbFound) {
-    // [CASE A: DB 모드]
     const uniqueSources = [...new Set(sources)].join(", ");
     headerBadge = `### 📚 **[내부 지식 DB 기반 답변]**\n> **참고한 강의**: ${uniqueSources}\n\n`;
 
@@ -272,11 +263,9 @@ ${OUTPUT_FORMAT}
 
 [사용자 질문]: ${userQuery}
 `;
-    // 🟢 [핵심] DB 모드에서도 검색 도구 활성화 (이중 안전장치)
     tools = [{ google_search: {} }];
 
   } else {
-    // [CASE B: 웹 검색 모드]
     headerBadge = `### 🌐 **[구글 웹 검색 기반 답변]**\n> **알림**: 내부 DB에 관련 내용이 없어 웹 검색을 수행했습니다.\n\n`;
 
     finalPrompt = `

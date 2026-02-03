@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { ArrowLeft, Camera, Send, Sparkles, X, BarChart2, Wand2, Cpu, Info } from "lucide-react";
 import { useLanguage } from "@/app/components/language-context";
 import { callGemini, resizeImage, checkCurrentModel, INITIAL_PROMPT, GRAPH_PROMPT } from "@/lib/gemini";
-import { Storage, HistoryItem } from "@/lib/storage";
+import { Storage, HistoryItem, ChatMessage } from "@/lib/storage"; // 🟢 ChatMessage 타입 import 확인
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
@@ -25,14 +25,6 @@ interface ParsedSection {
   content: string;
 }
 
-interface ChatMessage {
-  id: string;
-  role: 'user' | 'ai';
-  text?: string;
-  image?: string;
-  result?: { explanation: string; graphCode: string };
-}
-
 export function SolverScreen({ onBack, initialHistory }: SolverScreenProps) {
   const { t } = useLanguage();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -42,28 +34,42 @@ export function SolverScreen({ onBack, initialHistory }: SolverScreenProps) {
   const [progress, setProgress] = useState(0);
   const [currentModel, setCurrentModel] = useState<string>("");
   
+  // 🟢 [추가] 현재 대화 세션 ID 관리
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // 🟢 [수정] 히스토리 복원 로직 강화
   useEffect(() => {
     if (initialHistory) {
-      setMessages([
-        {
-          id: 'restored-user',
-          role: 'user',
-          text: initialHistory.question,
-          image: initialHistory.previewImage,
-        },
-        {
-          id: 'restored-ai',
-          role: 'ai',
-          result: {
-            explanation: initialHistory.answer,
-            graphCode: initialHistory.graphCode || "",
+      setCurrentSessionId(initialHistory.id); // 세션 ID 설정
+
+      if (initialHistory.messages && initialHistory.messages.length > 0) {
+        // 1. 신규 방식: 저장된 전체 대화 내역 복원
+        setMessages(initialHistory.messages);
+      } else {
+        // 2. 구형 데이터 호환성 유지 (첫 질문/답변만 있는 경우)
+        setMessages([
+          {
+            id: 'restored-user',
+            role: 'user',
+            text: initialHistory.question,
+            image: initialHistory.previewImage,
           },
-        }
-      ]);
+          {
+            id: 'restored-ai',
+            role: 'ai',
+            result: {
+              explanation: initialHistory.answer,
+              graphCode: initialHistory.graphCode || "",
+            },
+          }
+        ]);
+      }
     } else {
+      // 새 질문인 경우 초기화
       setMessages([]);
+      setCurrentSessionId(Date.now().toString()); // 새 ID 생성
     }
   }, [initialHistory]);
 
@@ -101,32 +107,26 @@ export function SolverScreen({ onBack, initialHistory }: SolverScreenProps) {
     return () => clearInterval(interval);
   }, [isProcessing]);
 
-  // 🟢 [수정됨] 답변 파싱 로직 (출처 배지 인식 기능 추가)
+  // 답변 파싱 로직 (기존 유지)
   const parseResponse = (text: string): ParsedSection[] => {
-    // 정규식: **숫자. 제목** 패턴을 찾음
     const regex = /\*\*(\d+)\.\s(.*?)\*\*/g;
     const sections: ParsedSection[] = [];
     let lastIndex = 0;
     let match;
 
     while ((match = regex.exec(text)) !== null) {
-      // 1. 현재 매칭된 제목 앞부분의 텍스트를 가져옴
       const content = text.substring(lastIndex, match.index).trim();
       
       if (sections.length > 0) {
-        // 이미 섹션이 열려있다면, 그 섹션의 내용으로 저장
         sections[sections.length - 1].content = content;
       } else if (content.length > 0) {
-        // 🟢 [핵심] 열린 섹션이 없는데 내용이 있다? -> 이게 바로 '출처 배지'입니다!
         sections.push({ title: "📌 출처 및 알림", content: content });
       }
 
-      // 2. 새로운 섹션(문제 유형, 풀이 등)을 시작
       sections.push({ title: match[2], content: "" });
       lastIndex = regex.lastIndex;
     }
 
-    // 3. 마지막 섹션의 나머지 내용을 저장
     if (sections.length > 0) {
       sections[sections.length - 1].content = text.substring(lastIndex).trim();
     }
@@ -134,6 +134,7 @@ export function SolverScreen({ onBack, initialHistory }: SolverScreenProps) {
     return sections;
   };
 
+  // 🟢 [수정] 메시지 전송 및 저장 로직 통합
   const handleSend = async (inputText: string, imageFile: File | null, imageBase64: string | null) => {
     const apiKey = Storage.getApiKey();
     if (!apiKey) {
@@ -141,13 +142,16 @@ export function SolverScreen({ onBack, initialHistory }: SolverScreenProps) {
       return;
     }
 
+    // 1. 유저 메시지 추가
     const newUserMsg: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
       text: inputText,
       image: imageBase64 || undefined
     };
-    setMessages(prev => [...prev, newUserMsg]);
+    
+    const updatedMessagesWithUser = [...messages, newUserMsg];
+    setMessages(updatedMessagesWithUser);
     setIsProcessing(true);
     setShowGraph(false);
 
@@ -157,6 +161,7 @@ export function SolverScreen({ onBack, initialHistory }: SolverScreenProps) {
         base64ForApi = await resizeImage(imageFile);
       }
 
+      // 2. 문맥(Context) 구성
       let context = "";
       if (messages.length > 0) {
         context = "\n\n[이전 대화 기록 (참고용)]:\n" + messages.map(m => 
@@ -168,23 +173,34 @@ export function SolverScreen({ onBack, initialHistory }: SolverScreenProps) {
       
       const data = await callGemini(apiKey, promptText, base64ForApi);
 
+      // 3. AI 메시지 추가
       const newAiMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'ai',
         result: data
       };
-      setMessages(prev => [...prev, newAiMsg]);
+      
+      const finalMessages = [...updatedMessagesWithUser, newAiMsg];
+      setMessages(finalMessages);
 
+      // 4. 🟢 저장 로직 (신규 저장 또는 업데이트)
       if (messages.length === 0) {
+        // 첫 대화일 경우: 새로 만들기
         Storage.addHistory({
-          id: Date.now().toString(),
+          id: currentSessionId!, // useEffect에서 생성된 ID 사용
           type: imageFile ? "image" : "text",
           question: inputText || t("dashboard.image_question"),
           answer: data.explanation,
           graphCode: data.graphCode,
           timestamp: Date.now(),
-          previewImage: base64ForApi ? `data:image/jpeg;base64,${base64ForApi}` : undefined
+          previewImage: base64ForApi ? `data:image/jpeg;base64,${base64ForApi}` : undefined,
+          messages: finalMessages // 전체 메시지 저장
         });
+      } else {
+        // 이어지는 대화일 경우: 업데이트
+        if (currentSessionId) {
+          Storage.updateHistory(currentSessionId, finalMessages);
+        }
       }
 
     } catch (error: any) {
@@ -206,7 +222,7 @@ export function SolverScreen({ onBack, initialHistory }: SolverScreenProps) {
       const data = await callGemini(apiKey, prompt, null);
 
       if (data.graphCode) {
-        setMessages(prev => prev.map(msg => {
+        const updatedMessages = messages.map(msg => {
           if (msg.id === messageId && msg.result) {
             return {
               ...msg,
@@ -217,9 +233,17 @@ export function SolverScreen({ onBack, initialHistory }: SolverScreenProps) {
             };
           }
           return msg;
-        }));
+        });
+
+        setMessages(updatedMessages);
         setShowGraph(true);
         toast.success(t("solver.graph_success"));
+
+        // 🟢 그래프 생성 후에도 저장 상태 업데이트
+        if (currentSessionId) {
+          Storage.updateHistory(currentSessionId, updatedMessages);
+        }
+
       } else {
         toast.error(t("solver.graph_error"));
       }
@@ -430,6 +454,7 @@ export function SolverScreen({ onBack, initialHistory }: SolverScreenProps) {
   );
 }
 
+// ... InputCard 및 ResultCard 컴포넌트는 기존 코드 유지 ...
 function InputCard({ onSend, isProcessing, isCompact = false }: { 
   onSend: (text: string, file: File | null, base64: string | null) => void, 
   isProcessing: boolean,
@@ -525,13 +550,13 @@ function InputCard({ onSend, isProcessing, isCompact = false }: {
 }
 
 function ResultCard({ section, index }: { section: ParsedSection, index: number }) {
-  // 🟢 [추가됨] 출처 및 알림 섹션 전용 스타일
+  // 🟢 [수정됨] 출처 및 알림 섹션
   if (section.title.includes("출처") || section.title.includes("알림")) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: index * 0.1 }}
+        transition={{ delay: index * 0.1 }} // 👈 index 사용 (경고 해결)
         className="bg-gray-50 dark:bg-gray-800/50 rounded-[24px] p-5 border border-gray-200 dark:border-gray-700 mb-4"
       >
         <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-2 uppercase tracking-wider">
@@ -545,13 +570,14 @@ function ResultCard({ section, index }: { section: ParsedSection, index: number 
     );
   }
 
+  // 🟢 사용된 개념 섹션
   if (section.title.includes("사용된 개념")) {
     const concepts = section.content.split(/,|、/).map(c => c.trim()).filter(c => c);
     return (
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: index * 0.1 }}
+        transition={{ delay: index * 0.1 }} // 👈 index 사용
         className="bg-white dark:bg-gray-900 rounded-[24px] p-6 border border-gray-100 dark:border-gray-800 shadow-sm"
       >
         <h3 className="text-lg font-bold text-primary mb-4 flex items-center gap-2">
@@ -569,12 +595,13 @@ function ResultCard({ section, index }: { section: ParsedSection, index: number 
     );
   }
 
+  // 🟢 최종 정답 섹션
   if (section.title.includes("최종 정답") || section.title.includes("정답")) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: index * 0.1 }}
+        transition={{ delay: index * 0.1 }} // 👈 index 사용
         className="bg-gradient-to-br from-primary/10 to-accent/10 dark:from-primary/20 dark:to-accent/20 rounded-[24px] p-6 border border-primary/20 dark:border-primary/30 shadow-sm"
       >
         <h3 className="text-lg font-bold text-primary mb-2 flex items-center gap-2">
@@ -590,12 +617,13 @@ function ResultCard({ section, index }: { section: ParsedSection, index: number 
     );
   }
 
+  // 🟢 풀이 과정 섹션
   if (section.title.includes("풀이") || section.title.includes("과정")) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: index * 0.1 }}
+        transition={{ delay: index * 0.1 }} // 👈 index 사용
         className="bg-white dark:bg-gray-900 rounded-[24px] p-6 border border-gray-100 dark:border-gray-800 shadow-sm"
       >
         <h3 className="text-lg font-bold text-primary mb-6 flex items-center gap-2">
@@ -635,11 +663,12 @@ function ResultCard({ section, index }: { section: ParsedSection, index: number 
     );
   }
 
+  // 🟢 기본 섹션
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.1 }}
+      transition={{ delay: index * 0.1 }} // 👈 index 사용
       className="bg-white dark:bg-gray-900 rounded-[24px] p-6 border border-gray-100 dark:border-gray-800 shadow-sm"
     >
       <h3 className="text-lg font-bold text-primary mb-3 flex items-center gap-2">

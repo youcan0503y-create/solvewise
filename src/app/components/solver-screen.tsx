@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { ArrowLeft, Camera, Send, Sparkles, X, BarChart2, Wand2, Cpu } from "lucide-react";
+import { ArrowLeft, Camera, Send, Sparkles, X, BarChart2, Wand2, Cpu, Info } from "lucide-react";
 import { useLanguage } from "@/app/components/language-context";
 import { callGemini, resizeImage, checkCurrentModel, INITIAL_PROMPT, GRAPH_PROMPT } from "@/lib/gemini";
 import { Storage, HistoryItem } from "@/lib/storage";
@@ -101,22 +101,36 @@ export function SolverScreen({ onBack, initialHistory }: SolverScreenProps) {
     return () => clearInterval(interval);
   }, [isProcessing]);
 
+  // 🟢 [수정됨] 답변 파싱 로직 (출처 배지 인식 기능 추가)
   const parseResponse = (text: string): ParsedSection[] => {
+    // 정규식: **숫자. 제목** 패턴을 찾음
     const regex = /\*\*(\d+)\.\s(.*?)\*\*/g;
     const sections: ParsedSection[] = [];
     let lastIndex = 0;
     let match;
 
     while ((match = regex.exec(text)) !== null) {
+      // 1. 현재 매칭된 제목 앞부분의 텍스트를 가져옴
+      const content = text.substring(lastIndex, match.index).trim();
+      
       if (sections.length > 0) {
-        sections[sections.length - 1].content = text.substring(lastIndex, match.index).trim();
+        // 이미 섹션이 열려있다면, 그 섹션의 내용으로 저장
+        sections[sections.length - 1].content = content;
+      } else if (content.length > 0) {
+        // 🟢 [핵심] 열린 섹션이 없는데 내용이 있다? -> 이게 바로 '출처 배지'입니다!
+        sections.push({ title: "📌 출처 및 알림", content: content });
       }
+
+      // 2. 새로운 섹션(문제 유형, 풀이 등)을 시작
       sections.push({ title: match[2], content: "" });
       lastIndex = regex.lastIndex;
     }
+
+    // 3. 마지막 섹션의 나머지 내용을 저장
     if (sections.length > 0) {
       sections[sections.length - 1].content = text.substring(lastIndex).trim();
     }
+    
     return sections;
   };
 
@@ -511,6 +525,26 @@ function InputCard({ onSend, isProcessing, isCompact = false }: {
 }
 
 function ResultCard({ section, index }: { section: ParsedSection, index: number }) {
+  // 🟢 [추가됨] 출처 및 알림 섹션 전용 스타일
+  if (section.title.includes("출처") || section.title.includes("알림")) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: index * 0.1 }}
+        className="bg-gray-50 dark:bg-gray-800/50 rounded-[24px] p-5 border border-gray-200 dark:border-gray-700 mb-4"
+      >
+        <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-2 uppercase tracking-wider">
+          <Info className="w-4 h-4" />
+          {section.title}
+        </h3>
+        <div className="prose dark:prose-invert max-w-none text-sm text-gray-700 dark:text-gray-300">
+          <ReactMarkdown>{section.content}</ReactMarkdown>
+        </div>
+      </motion.div>
+    );
+  }
+
   if (section.title.includes("사용된 개념")) {
     const concepts = section.content.split(/,|、/).map(c => c.trim()).filter(c => c);
     return (
